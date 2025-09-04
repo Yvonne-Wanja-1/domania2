@@ -13,12 +13,12 @@ class PreferencesService {
   PreferencesService(this._prefs);
 
   // Theme preferences
-  Future<void> setThemeMode(String mode) async {
-    await _prefs.setString(_themeKey, mode);
+  Future<void> setDarkMode(bool isDark) async {
+    await _prefs.setBool(_themeKey, isDark);
   }
 
-  String getThemeMode() {
-    return _prefs.getString(_themeKey) ?? 'system';
+  bool getDarkMode() {
+    return _prefs.getBool(_themeKey) ?? false;
   }
 
   // Language preferences
