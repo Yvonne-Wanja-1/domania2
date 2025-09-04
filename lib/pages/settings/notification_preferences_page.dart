@@ -1,0 +1,77 @@
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../services/preferences_service.dart';
+
+class NotificationPreferencesPage extends StatefulWidget {
+  const NotificationPreferencesPage({Key? key}) : super(key: key);
+
+  @override
+  _NotificationPreferencesPageState createState() =>
+      _NotificationPreferencesPageState();
+}
+
+class _NotificationPreferencesPageState
+    extends State<NotificationPreferencesPage> {
+  late PreferencesService _preferencesService;
+  bool _emailNotifications = true; // Default value
+  bool _pushNotifications = true; // Default value
+
+  @override
+  void initState() {
+    super.initState();
+    _initPreferences();
+  }
+
+  Future<void> _initPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    _preferencesService = PreferencesService(prefs);
+    setState(() {
+      _emailNotifications = _preferencesService.getEmailNotifications();
+      _pushNotifications = _preferencesService.getPushNotifications();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Notification Preferences'),
+      ),
+      body: ListView(
+        children: [
+          Card(
+            margin: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                SwitchListTile(
+                  title: const Text('Email Notifications'),
+                  subtitle: const Text('Receive important updates via email'),
+                  value: _emailNotifications,
+                  onChanged: (bool value) {
+                    setState(() {
+                      _emailNotifications = value;
+                      _preferencesService.setEmailNotifications(value);
+                    });
+                  },
+                ),
+                const Divider(),
+                SwitchListTile(
+                  title: const Text('Push Notifications'),
+                  subtitle:
+                      const Text('Receive instant updates on your device'),
+                  value: _pushNotifications,
+                  onChanged: (bool value) {
+                    setState(() {
+                      _pushNotifications = value;
+                      _preferencesService.setPushNotifications(value);
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
