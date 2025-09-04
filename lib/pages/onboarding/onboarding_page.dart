@@ -54,6 +54,20 @@ class _OnboardingPageState extends State<OnboardingPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          TextButton(
+            onPressed: () {
+              SharedPreferences.getInstance().then((prefs) {
+                prefs.setBool('hasSeenOnboarding', false);
+              });
+            },
+            child: const Text('Reset Onboarding'),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Column(
           children: [

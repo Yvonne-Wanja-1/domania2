@@ -15,9 +15,16 @@ import 'package:domain/services/auth_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize AppState
   final appState = AppState();
   await appState.loadThemePreference();
 
+  // Initialize AuthService
+  final authService = AuthService();
+  await authService.initializeAuth();
+
+  // Check onboarding status
   final prefs = await SharedPreferences.getInstance();
   final hasSeenOnboarding = prefs.getBool('hasSeenOnboarding') ?? false;
 
@@ -25,14 +32,14 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: appState),
-        ChangeNotifierProvider(create: (_) => AuthService()),
+        ChangeNotifierProvider.value(value: authService),
       ],
       child: DomaniaApp(hasSeenOnboarding: hasSeenOnboarding),
     ),
   );
 }
 
-class DomaniaApp extends StatelessWidget {
+class DomaniaApp extends StatefulWidget {
   final bool hasSeenOnboarding;
 
   const DomaniaApp({
@@ -41,9 +48,42 @@ class DomaniaApp extends StatelessWidget {
   });
 
   @override
+  State<DomaniaApp> createState() => _DomaniaAppState();
+}
+
+class _DomaniaAppState extends State<DomaniaApp> {
+  bool _initialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkFirstLaunch();
+  }
+
+  Future<void> _checkFirstLaunch() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!prefs.containsKey('hasSeenOnboarding')) {
+      await prefs.setBool('hasSeenOnboarding', false);
+    }
+    setState(() {
+      _initialized = true;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
     final authService = context.watch<AuthService>();
+
+    if (!_initialized) {
+      return const MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: CircularProgressIndicator(),
+          ),
+        ),
+      );
+    }
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -83,7 +123,7 @@ class DomaniaApp extends StatelessWidget {
         ),
       ),
       themeMode: appState.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-      home: !hasSeenOnboarding
+      home: !widget.hasSeenOnboarding
           ? const OnboardingPage()
           : authService.currentUser == null
               ? const LoginPage()
