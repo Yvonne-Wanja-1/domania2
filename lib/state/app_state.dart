@@ -22,14 +22,14 @@ class AppState extends ChangeNotifier {
 
   Future<void> toggleTheme(bool isDark) async {
     _isDarkMode = isDark;
-    await _preferencesService.setThemeMode(isDark ? 'dark' : 'light');
+    await _preferencesService.setDarkMode(isDark);
     notifyListeners();
   }
 
   Future<void> loadThemePreference() async {
     final prefs = await SharedPreferences.getInstance();
     _preferencesService = PreferencesService(prefs);
-    _isDarkMode = _preferencesService.getThemeMode() == 'dark';
+    _isDarkMode = _preferencesService.getDarkMode();
     notifyListeners();
   }
 }

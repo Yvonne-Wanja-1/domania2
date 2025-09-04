@@ -1,29 +1,89 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:domain/pages/register_domain_page.dart';
 import 'package:domain/pages/cart_page.dart';
 import 'package:domain/pages/pricing_page.dart';
 import 'package:domain/pages/support_page.dart';
 import 'package:domain/pages/my_domains_page.dart';
 import 'package:domain/pages/profile_page.dart';
+import 'package:domain/pages/onboarding/onboarding_page.dart';
+import 'package:domain/pages/auth/login_page.dart';
 import 'package:domain/widgets/app_drawer.dart';
 import 'package:domain/state/app_state.dart';
+import 'package:domain/services/auth_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize AppState
+  final appState = AppState();
+  await appState.loadThemePreference();
+
+  // Initialize AuthService
+  final authService = AuthService();
+  await authService.initializeAuth();
+
+  // Check onboarding status
+  final prefs = await SharedPreferences.getInstance();
+  final hasSeenOnboarding = prefs.getBool('hasSeenOnboarding') ?? false;
+
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => AppState(),
-      child: const DomaniaApp(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider.value(value: appState),
+        ChangeNotifierProvider.value(value: authService),
+      ],
+      child: DomaniaApp(hasSeenOnboarding: hasSeenOnboarding),
     ),
   );
 }
 
-class DomaniaApp extends StatelessWidget {
-  const DomaniaApp({super.key});
+class DomaniaApp extends StatefulWidget {
+  final bool hasSeenOnboarding;
+
+  const DomaniaApp({
+    super.key,
+    required this.hasSeenOnboarding,
+  });
+
+  @override
+  State<DomaniaApp> createState() => _DomaniaAppState();
+}
+
+class _DomaniaAppState extends State<DomaniaApp> {
+  bool _initialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkFirstLaunch();
+  }
+
+  Future<void> _checkFirstLaunch() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!prefs.containsKey('hasSeenOnboarding')) {
+      await prefs.setBool('hasSeenOnboarding', false);
+    }
+    setState(() {
+      _initialized = true;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
+    final authService = context.watch<AuthService>();
+
+    if (!_initialized) {
+      return const MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: CircularProgressIndicator(),
+          ),
+        ),
+      );
+    }
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -63,7 +123,11 @@ class DomaniaApp extends StatelessWidget {
         ),
       ),
       themeMode: appState.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-      home: const HomePage(),
+      home: !widget.hasSeenOnboarding
+          ? const OnboardingPage()
+          : authService.currentUser == null
+              ? const LoginPage()
+              : const HomePage(),
     );
   }
 }

@@ -1,5 +1,9 @@
 import 'package:domain/pages/settings_page.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'package:provider/provider.dart';
+import '../services/auth_service.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -12,6 +16,8 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _darkMode = false;
   bool _emailNotifications = true;
   bool _pushNotifications = true;
+  File? _profileImage;
+  final _picker = ImagePicker();
 
   final List<RecentActivity> _recentActivities = [
     RecentActivity(
@@ -93,7 +99,41 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  Future<void> _pickImage() async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        setState(() {
+          _profileImage = File(image.path);
+        });
+
+        // Update the profile picture
+        final success =
+            await context.read<AuthService>().updateProfilePicture(image.path);
+
+        if (!success && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to update profile picture')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to pick image')),
+        );
+      }
+    }
+  }
+
   Widget _buildProfileHeader() {
+    final user = context.watch<AuthService>().currentUser;
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 32.0),
       child: Column(
@@ -101,24 +141,36 @@ class _ProfilePageState extends State<ProfilePage> {
           Stack(
             alignment: Alignment.center,
             children: [
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Colors.blueAccent.withOpacity(0.2),
-                    width: 3,
+              GestureDetector(
+                onTap: _pickImage,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.blueAccent.withOpacity(0.2),
+                      width: 3,
+                    ),
                   ),
-                ),
-                child: Hero(
-                  tag: 'profile-picture',
-                  child: CircleAvatar(
-                    radius: 50,
-                    backgroundColor: Colors.blueAccent.shade200,
-                    child: const Icon(
-                      Icons.person,
-                      size: 50,
-                      color: Colors.white,
+                  child: Hero(
+                    tag: 'profile-picture',
+                    child: CircleAvatar(
+                      radius: 50,
+                      backgroundColor: Colors.blueAccent.shade200,
+                      backgroundImage: _profileImage != null
+                          ? FileImage(_profileImage!)
+                          : user?.profilePicture != null
+                              ? NetworkImage(user!.profilePicture!)
+                                  as ImageProvider
+                              : null,
+                      child: (_profileImage == null &&
+                              user?.profilePicture == null)
+                          ? const Icon(
+                              Icons.person,
+                              size: 50,
+                              color: Colors.white,
+                            )
+                          : null,
                     ),
                   ),
                 ),
