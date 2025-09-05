@@ -134,22 +134,26 @@ class AuthService extends ChangeNotifier {
   Exception _handleFirebaseAuthError(firebase_auth.FirebaseAuthException e) {
     switch (e.code) {
       case 'invalid-email':
-        return Exception('The email address is not valid.');
+        return Exception('Please enter a valid email address.');
       case 'user-disabled':
-        return Exception('This user has been disabled.');
+        return Exception(
+            'This account has been disabled. Please contact support.');
       case 'user-not-found':
-        return Exception('No user found for that email.');
+        return Exception('This email is not registered. Please sign up first.');
       case 'wrong-password':
-        return Exception('Wrong password provided for that user.');
+        return Exception('Incorrect password. Please try again.');
       case 'email-already-in-use':
         return Exception(
-            'The email address is already in use by another account.');
+            'An account with this email already exists. Please sign in instead.');
       case 'weak-password':
-        return Exception('The password provided is too weak.');
+        return Exception(
+            'Please choose a stronger password (at least 6 characters).');
       case 'operation-not-allowed':
-        return Exception('Email/password accounts are not enabled.');
+        return Exception(
+            'Sign up with email and password is not enabled. Please contact support.');
       default:
-        return Exception('An error occurred. Please try again.');
+        return Exception(
+            '${e.message ?? 'An error occurred while signing up. Please try again.'}');
     }
   }
 
