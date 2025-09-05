@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:domain/pages/register_domain_page.dart';
 import 'package:domain/pages/cart_page.dart';
 import 'package:domain/pages/pricing_page.dart';
@@ -13,6 +14,9 @@ import 'package:domain/pages/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Firebase
+  await Firebase.initializeApp();
 
   // Initialize AppState
   final appState = AppState();
