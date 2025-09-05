@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import '../models/user_model.dart';
 
 class AuthService extends ChangeNotifier {
+  final firebase_auth.FirebaseAuth _auth = firebase_auth.FirebaseAuth.instance;
   User? _currentUser;
   bool _isLoading = false;
 
@@ -11,21 +13,26 @@ class AuthService extends ChangeNotifier {
   bool get isLoading => _isLoading;
 
   Future<void> initializeAuth() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userJson = prefs.getString('user');
+    // Check if user is already signed in with Firebase
+    final firebaseUser = _auth.currentUser;
+    if (firebaseUser != null) {
+      _currentUser = User(
+        id: firebaseUser.uid,
+        email: firebaseUser.email!,
+        name: firebaseUser.displayName,
+        createdAt: firebaseUser.metadata.creationTime ?? DateTime.now(),
+      );
 
-    if (userJson != null) {
-      try {
-        final userData = Map<String, dynamic>.from(
-          // ignore: unnecessary_null_comparison
-          userJson != null ? json.decode(userJson) : {},
-        );
-        _currentUser = User.fromJson(userData);
-        notifyListeners();
-      } catch (e) {
-        // Invalid stored user data, clear it
-        await prefs.remove('user');
-      }
+      // Update SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user', json.encode(_currentUser!.toJson()));
+      notifyListeners();
+    } else {
+      // Clear any stored user data if not signed in with Firebase
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('user');
+      _currentUser = null;
+      notifyListeners();
     }
   }
 
@@ -38,27 +45,45 @@ class AuthService extends ChangeNotifier {
       _isLoading = true;
       notifyListeners();
 
-      // TODO: Implement actual signup logic with your backend
-      // This is just a mock implementation
-      await Future.delayed(const Duration(seconds: 1));
-      _currentUser = User(
-        id: DateTime.now().toString(),
+      // Create user with email and password in Firebase
+      final userCredential = await _auth.createUserWithEmailAndPassword(
         email: email,
-        name: name,
-        createdAt: DateTime.now(),
+        password: password,
       );
 
-      // Save user data to SharedPreferences
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user', json.encode(_currentUser!.toJson()));
+      if (userCredential.user != null) {
+        // Update display name if provided
+        if (name != null) {
+          await userCredential.user!.updateDisplayName(name);
+        }
 
-      _isLoading = false;
-      notifyListeners();
-      return true;
-    } catch (e) {
+        _currentUser = User(
+          id: userCredential.user!.uid,
+          email: email,
+          name: name,
+          createdAt: DateTime.now(),
+        );
+
+        // Save user data to SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('user', json.encode(_currentUser!.toJson()));
+
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      }
+
       _isLoading = false;
       notifyListeners();
       return false;
+    } on firebase_auth.FirebaseAuthException catch (e) {
+      _isLoading = false;
+      notifyListeners();
+      throw _handleFirebaseAuthError(e);
+    } catch (e) {
+      _isLoading = false;
+      notifyListeners();
+      rethrow;
     }
   }
 
@@ -70,34 +95,74 @@ class AuthService extends ChangeNotifier {
       _isLoading = true;
       notifyListeners();
 
-      // TODO: Implement actual signin logic with your backend
-      // This is just a mock implementation
-      await Future.delayed(const Duration(seconds: 1));
-      _currentUser = User(
-        id: DateTime.now().toString(),
+      final userCredential = await _auth.signInWithEmailAndPassword(
         email: email,
-        createdAt: DateTime.now(),
+        password: password,
       );
 
-      // Save user data to SharedPreferences
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user', json.encode(_currentUser!.toJson()));
+      if (userCredential.user != null) {
+        _currentUser = User(
+          id: userCredential.user!.uid,
+          email: email,
+          name: userCredential.user!.displayName,
+          createdAt: DateTime.now(),
+        );
 
-      _isLoading = false;
-      notifyListeners();
-      return true;
-    } catch (e) {
+        // Save user data to SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('user', json.encode(_currentUser!.toJson()));
+
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      }
+
       _isLoading = false;
       notifyListeners();
       return false;
+    } on firebase_auth.FirebaseAuthException catch (e) {
+      _isLoading = false;
+      notifyListeners();
+      throw _handleFirebaseAuthError(e);
+    } catch (e) {
+      _isLoading = false;
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Exception _handleFirebaseAuthError(firebase_auth.FirebaseAuthException e) {
+    switch (e.code) {
+      case 'invalid-email':
+        return Exception('The email address is not valid.');
+      case 'user-disabled':
+        return Exception('This user has been disabled.');
+      case 'user-not-found':
+        return Exception('No user found for that email.');
+      case 'wrong-password':
+        return Exception('Wrong password provided for that user.');
+      case 'email-already-in-use':
+        return Exception(
+            'The email address is already in use by another account.');
+      case 'weak-password':
+        return Exception('The password provided is too weak.');
+      case 'operation-not-allowed':
+        return Exception('Email/password accounts are not enabled.');
+      default:
+        return Exception('An error occurred. Please try again.');
     }
   }
 
   Future<void> signOut() async {
-    _currentUser = null;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('user');
-    notifyListeners();
+    try {
+      await _auth.signOut();
+      _currentUser = null;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('user');
+      notifyListeners();
+    } catch (e) {
+      throw Exception('Error signing out. Please try again.');
+    }
   }
 
   Future<bool> updateProfilePicture(String imagePath) async {
